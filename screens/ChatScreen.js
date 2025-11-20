@@ -1,4 +1,4 @@
-// screens/ChatScreen.js — fixed keyboard overlapping issue
+// screens/ChatScreen.js — show username for each message + fixed keyboard handling
 import React, { useEffect, useRef, useState } from "react";
 import {
   SafeAreaView,
@@ -24,14 +24,15 @@ export default function ChatScreen({ navigation, route }) {
   const loadMessages = async () => {
     try {
       const res = await executeSqlAsync(
-        `SELECT * FROM messages 
-         WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?) 
+        `SELECT * FROM messages
+         WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
          ORDER BY created_at ASC;`,
         [currentUser.id, otherUser.id, otherUser.id, currentUser.id]
       );
       const arr = [];
       for (let i = 0; i < res.rows.length; i++) arr.push(res.rows.item(i));
       setMessages(arr);
+      // small delay to allow layout, then scroll to end
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -99,7 +100,12 @@ export default function ChatScreen({ navigation, route }) {
         },
       });
     } else {
-      options.push({ text: "Copy", onPress: () => {} });
+      options.push({
+        text: "Copy",
+        onPress: () => {
+          // copy to clipboard (optional: implement if you want)
+        },
+      });
     }
     options.push({ text: "Cancel", style: "cancel" });
     Alert.alert("Message", "", options, { cancelable: true });
@@ -107,13 +113,30 @@ export default function ChatScreen({ navigation, route }) {
 
   const renderItem = ({ item }) => {
     const mine = item.from_id === currentUser.id;
+    const username = mine ? currentUser.username : otherUser.username;
+
     return (
-      <TouchableOpacity onLongPress={() => onLongPressMsg(item)} activeOpacity={0.8}>
-        <View style={[styles.msgRow, mine ? styles.msgMine : styles.msgTheir]}>
-          <Text style={styles.msgText}>{item.content}</Text>
-          <Text style={styles.msgTime}>{new Date(item.created_at).toLocaleTimeString()}</Text>
-        </View>
-      </TouchableOpacity>
+      <View
+        style={[
+          styles.messageWrapper,
+          mine ? styles.messageWrapperMine : styles.messageWrapperTheir,
+        ]}
+      >
+        {/* Username label */}
+        <Text style={[styles.username, mine ? styles.usernameMine : styles.usernameTheir]}>
+          {username}
+        </Text>
+
+        {/* Message bubble */}
+        <TouchableOpacity onLongPress={() => onLongPressMsg(item)} activeOpacity={0.85}>
+          <View style={[styles.msgRow, mine ? styles.msgMine : styles.msgTheir]}>
+            <Text style={styles.msgText}>{item.content}</Text>
+            <Text style={styles.msgTime}>
+              {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -129,7 +152,7 @@ export default function ChatScreen({ navigation, route }) {
           data={messages}
           keyExtractor={(i) => `${i.id}`}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 12, paddingBottom: 90 }}
+          contentContainerStyle={{ padding: 12, paddingBottom: 110 }}
           keyboardShouldPersistTaps="handled"
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
@@ -154,11 +177,55 @@ export default function ChatScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f0b1a" },
-  msgRow: { maxWidth: "80%", padding: 10, borderRadius: 10, marginVertical: 4 },
-  msgMine: { backgroundColor: "#6ee7b7", marginLeft: "18%", alignSelf: "flex-end" },
-  msgTheir: { backgroundColor: "#1a1625", borderColor: "#24152f", borderWidth: 1, marginRight: "18%", alignSelf: "flex-start" },
+
+  /* wrapper around each message + username label */
+  messageWrapper: {
+    maxWidth: "100%",
+    marginVertical: 6,
+    paddingHorizontal: 6,
+  },
+  messageWrapperMine: { alignItems: "flex-end" },
+  messageWrapperTheir: { alignItems: "flex-start" },
+
+  /* username label */
+  username: {
+    fontSize: 11,
+    marginBottom: 6,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+    opacity: 0.95,
+  },
+  usernameMine: { color: "#9ef0c9", textAlign: "right" },
+  usernameTheir: { color: "#cfc6ff", textAlign: "left" },
+
+  /* message bubble */
+  msgRow: {
+    maxWidth: "80%",
+    padding: 10,
+    borderRadius: 12,
+    marginVertical: 2,
+  },
+  msgMine: {
+    backgroundColor: "#6ee7b7",
+    marginLeft: "18%",
+    alignSelf: "flex-end",
+  },
+  msgTheir: {
+    backgroundColor: "#1a1625",
+    borderColor: "#24152f",
+    borderWidth: 1,
+    marginRight: "18%",
+    alignSelf: "flex-start",
+  },
+
   msgText: { color: "#fff", fontSize: 15 },
-  msgTime: { color: "#aaa", fontSize: 10, marginTop: 4, alignSelf: "flex-end" },
+  msgTime: {
+    color: "#aaa",
+    fontSize: 10,
+    marginTop: 6,
+    alignSelf: "flex-end",
+  },
+
   composerContainer: {
     flexDirection: "row",
     alignItems: "center",
